@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template, request,redirect,url_for,make_response
+from flask import render_template, request,redirect,url_for, Flask
 import os
 import pymongo
 from pymongo import MongoClient
@@ -11,7 +11,12 @@ from pymongo.errors import ConfigurationError
 from flask import jsonify
 import dns.resolver
 import datetime
+from flask_cors import CORS, cross_origin
 
+def _corsify_actual_response(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response
+    
 try:
     client = pymongo.MongoClient("mongodb+srv://todd:O12345@cluster0.nloih.mongodb.net/myFirstDatabase?retryWrites=true&w=majority",serverSelectionTimeoutMS=10, connectTimeoutMS=20000, socketTimeoutMS=None, socketKeepAlive=True, connect=False, maxPoolsize=1)
     print("started2222")
@@ -40,10 +45,14 @@ if not collection:
 #  "ratings": [123,24],
 # }
 
-def _corsify_actual_response(response):
-    response.headers.add("Access-Control-Allow-Origin", "*")
-    return response
-
+# def _corsify_actual_response(response):
+#     response.headers.add("Access-Control-Allow-Origin", "*")
+#     return response
+@app.route("/")
+@cross_origin()
+def origin():
+    return jsonify(success=True)
+    
 def client_exist():
     connection = MongoClient("mongodb+srv://todd:O12345@cluster0.nloih.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
     try:
@@ -188,16 +197,23 @@ def get_user(method, email, last_name, first_name):
         return collection.find({"last_name": last_name, "first_name": first_name}) 
     return {}
 
-@app.route("/set", methods=["POST","GET"])
+@app.route("/set", methods=["POST","GET","OPTIONS"])
+@cross_origin()
 def set():
-    if not client_exist():
-        return
 
-    if request.method == "POST":
+    if request.method == "OPTIONS":
+        print("OPTIONS")
+        return jsonify(success=True)
+    elif request.method == "GET":
+        print("GET")
+        return jsonify(success=True)
+    elif request.method == "POST":
         content = request.json
 
+        # if not client_exist():
+        #     return {}
         # print("set :", end='')
-        print(content)
+        print("POST")
         
         if content["type"] == 0:
             result = set_website(content["url"], content["ratings"])
@@ -211,19 +227,27 @@ def set():
             result = {}
 
         # print("result :", end='')
-        # print(result)
+        print(result)
 
-        return _corsify_actual_response(result)
+        return result
     return {}
 
-@app.route("/get", methods=["POST","GET"])
+@app.route("/get", methods=["POST","GET","OPTIONS"])
+@cross_origin()
 def get():
-    if not client_exist():
-        return
 
-    if request.method == "POST":
+    if request.method == "OPTIONS":
+        print("OPTIONS")
+        return jsonify(success=True)
+    elif request.method == "GET":
+        print("GET")
+        return jsonify(success=True)
+    elif request.method == "POST" or request.method == "OPTIONS":
+        # if not client_exist():
+        #     return {}
+
         content = request.json
-
+        print(content)
         # print("get :", end='')
         # print(content)
 
@@ -244,6 +268,6 @@ def get():
         # if len(list(result)) == 0:
         #     return ''
 
-        return _corsify_actual_response(result)
+        return result
     return {}
 

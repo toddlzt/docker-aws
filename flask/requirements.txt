@@ -2,3 +2,4 @@ flask
 uwsgi
 pymongo
 dnspython
+flask-cors
