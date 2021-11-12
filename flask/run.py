@@ -2,8 +2,7 @@ from app import app
 import pymongo
 from pymongo import MongoClient
 
-
-print("started!!!")
+print("Started from run.py")
 
 def connect(host='https://google.com'):
     try:
@@ -13,8 +12,5 @@ def connect(host='https://google.com'):
         return False
 
 if __name__ == "__main__":
-    print( "connected" if connect() else "no internet!" )
-
-    # print(client)
-    
-    app.run(debug=False)
+    print( "Connected" if connect() else "No internet!" )
+    app.run(debug=True)
