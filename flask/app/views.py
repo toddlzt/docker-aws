@@ -34,7 +34,7 @@ try:
     if not db:
         app.logger.error("No db")
         exit()
-    collection = db["2"]
+    collection = db["3"]
     if not collection:
         app.logger.error("No collection")
         exit()
@@ -61,9 +61,10 @@ def client_exist():
 #     "comment_type": 1,
 #     "website": url,
 #     "user": email,
-#     "parent_comment": xf0b2f55096f7622f6000000,
+#     "title": this is title,
+#     "child_comments": xf0b2f55096f7622f6000000,
 #     "text": "this is a comment",
-#     "ratings": [12,23],
+#     "stats": [12,23],
 #     "date":"asdasddsa",
 #     "img":[
 #         "jksahfdkjhquionq123213"
@@ -72,69 +73,163 @@ def client_exist():
 #     ],
 # }
 
-def set_comments(search_method, content):
+def set_comments(action, content, comment = None):
     date = datetime.datetime.now()
-    comment = ""
-    if search_method == "update":
-        if "ratings" not in content:
-            return log_warn_ret("No comment ratings")
-        elif "user_id" not in content:
+    # if action == "update_main":
+    if action == "add_child":
+        if "user_id" not in content:
             return log_warn_ret("No comment user_id")
-        comment = get_comments("id", {"_id": content["user_id"]})
-        if comment:
-            try:
-                comment = collection.update_one({"comment_type": { "$exists" : True }, 
-                                                "_id": ObjectId(content["user_id"])},
-                                    {"$set": {"ratings": [comment["ratings"][0] + content["ratings"][0], 
-                                                          comment["ratings"][1] + content["ratings"][1]]}})
-            except:
-                return log_warn_ret("Update comment _id issue")
-                
-            return get_comments("id", {"_id": content["user_id"]})
+        elif "parent_id" not in content:
+            return log_warn_ret("No comment parent_id")
+        elif "text" not in content:
+            return log_warn_ret("No comment text")
+
+        comment = get_comments("id",{"_id": content["parent_id"]})
+        if comment == "No valid comment id":
+            return log_warn_ret("No valid comment id")
+
+        user = get_user("id",{"_id": content["user_id"]})
+        if user == "Get user by id no user":
+            return log_warn_ret("Get user by id no user")
+
+        comment["child_comments"].append({"id": len(comment["child_comments"]),
+                                          "user_id": content["user_id"],
+                                          "likes": [0,0],
+                                          "views": 0,
+                                          "date": date,
+                                          "text": content["text"]})
+
+        collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
+                                {"$set": {"child_comments": comment["child_comments"]}})
+        return comment
+    elif action == "like_child":
+        if "user_id" not in content:
+            return log_warn_ret("No comment user_id")
+        elif "parent_id" not in content:
+            return log_warn_ret("No comment parent_id")
+        elif "like" not in content:
+            return log_warn_ret("No comment like")
+        elif "index" not in content:
+            return log_warn_ret("No comment index")
+
+        comment = get_comments("id",{"_id": content["parent_id"]})
+        if comment == "No valid comment id":
+            return log_warn_ret("No valid comment id")
+
+        user = get_user("id",{"_id": content["user_id"]})
+        if user == "Get user by id no user":
+            return log_warn_ret("Get user by id no user")
+
+        if content["like"] == "true":
+            comment["child_comments"][content["index"]]["likes"][0] += 1
         else:
-            return log_warn_ret("No comment found to be updated")
-    elif search_method == "new":
+            comment["child_comments"][content["index"]]["likes"][1] += 1
+
+
+        collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
+                                {"$set": {"child_comments": comment["child_comments"]}})
+        return comment
+    elif action == "like_parent":
+        if "user_id" not in content:
+            return log_warn_ret("No comment user_id")
+        elif "parent_id" not in content:
+            return log_warn_ret("No comment parent_id")
+        elif "like" not in content:
+            return log_warn_ret("No comment like")
+
+        comment = get_comments("id",{"_id": content["parent_id"]})
+        if comment == "No valid comment id":
+            return log_warn_ret("No valid comment id")
+
+        user = get_user("id",{"_id": content["user_id"]})
+        if user == "Get user by id no user":
+            return log_warn_ret("Get user by id no user")
+        
+        if content["like"] == "true":
+            comment["likes"][0] += 1
+        else:
+            comment["likes"][1] += 1
+        collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
+                                {"$set": {"likes": comment["likes"]}})
+        return comment
+
+    elif action == "views":
+        if comment == None:
+            return
+        if "views" in comment:
+            comment["views"] += 1
+        if "child_comments" in comment:
+            for idx in range(0,len(comment["child_comments"])):
+                comment["child_comments"][idx]["views"] += 1
+        return comment
+    elif action == "new":
         if "comment_type" not in content:
             return log_warn_ret("No comment comment_type")
         elif "website" not in content:
             return log_warn_ret("No comment website")
         elif "user_id" not in content:
             return log_warn_ret("No comment user_id")
-        elif "parent_comment" not in content:
-            return log_warn_ret("No comment parent_comment")
+        elif "title" not in content:
+            return log_warn_ret("No comment title")
         elif "ratings" not in content:
             return log_warn_ret("No comment ratings")
+        elif "customerService" not in content["ratings"]:
+            return log_warn_ret("No comment customerService")
+        elif "productQuality" not in content["ratings"]:
+            return log_warn_ret("No comment productQuality")
+        elif "shippingSpeed" not in content["ratings"]:
+            return log_warn_ret("No comment shippingSpeed")
         elif "text" not in content:
             return log_warn_ret("No comment text")
 
         comment_id = collection.insert_one({"comment_type": content["comment_type"],
                                          "website": content["website"], 
                                          "user_id": content["user_id"], 
-                                         "parent_comment": content["parent_comment"], 
+                                         "title": content["title"], 
+                                         "child_comments": [], 
                                          "ratings": content["ratings"], 
                                          "text": content["text"], 
-                                         "date":date})
-        return get_comments("id",{"_id": comment_id.inserted_id})
+                                         "date": date,
+                                         "views": 0,
+                                         "likes": [0,0],
+                                         })
+        
+        comment = get_comments("id",{"_id": comment_id.inserted_id})
+
+        content["_id"] = content["user_id"]
+        user = get_user("id",content) 
+        if user and '_id' in user:
+            user['_id'] = str(user['_id'])
+        else:
+            return comment
+        comment["user_id"] = user["_id"]
+        comment["email"] = user["email"]
+        comment["image"] = user["image"]
+        comment["first_name"] = user["first_name"]
+        comment["last_name"] = user["last_name"]
+        return comment
     else:
-        return log_warn_ret("No search_method set_comments")
+        return log_warn_ret("No action set_comments")
     if comment and '_id' in comment:
         comment['_id'] = str(comment['_id'])
     return comment
 
-def get_comments(search_method, content):
+def get_comments(action, content):
     comments = ""
-    if search_method == "website":
+    if action == "website":
         if "website" not in content:
             return log_warn_ret("No comment website")
-
+        
         comments = list(collection.find({"comment_type":{ "$exists" : True }, "website": content["website"]}))
         for comment in comments:
+            s = ""
             if comment and '_id' in comment:
                 comment['_id'] = str(comment['_id'])
             else:
                 break
+            content["_id"] = comment["user_id"]
+            user = get_user("id",content) 
 
-            user = collection.find_one({"email": comment["user_id"]}) 
             if user and '_id' in user:
                 user['_id'] = str(user['_id'])
             else:
@@ -145,8 +240,16 @@ def get_comments(search_method, content):
             comment["image"] = user["image"]
             comment["first_name"] = user["first_name"]
             comment["last_name"] = user["last_name"]
+        
+            comment = set_comments("views","",comment)
+            collection.update_one({"comment_type": { "$exists" : True }, 
+                        "_id": ObjectId(comment["_id"])},
+                        {"$set": {"views": comment["views"],
+                                  "child_comments": comment["child_comments"]
+                                }})
+            
 
-    elif search_method == "user":
+    elif action == "user":
         if "user_id" not in content:
             return log_warn_ret("No comment user_id")
 
@@ -156,7 +259,7 @@ def get_comments(search_method, content):
                 comment['_id'] = str(comment['_id'])
             else:
                 break
-    elif search_method == "id":
+    elif action == "id":
         if "_id" not in content:
             return log_warn_ret("No comment _id")
         try:
@@ -174,28 +277,44 @@ def get_comments(search_method, content):
 # Websites {
 #  "_id": 4f0b2f55096f7622f6000000,
 #  "URL": "www.google.com",
-#  "ratings": [2,3,4,5,24],
+#  "stats": [2,3,4,5,24],
 # }
 
-def set_website(content):
-    if "ratings" not in content:
-        return log_warn_ret("No web ratings")
-    elif "URL" not in content:
+def set_website(action, content, website=None):
+    if "URL" not in content:
         return log_warn_ret("No web URL")
-    website = get_website(content)
 
-    if website == "not found":
+    if action == "new":
+        date = datetime.datetime.now()
         website = collection.insert_one({
             "url": content["URL"],
-            "ratings": content["ratings"]})
+            "views": 0,
+            "created": date,
+            "ratings": {"customerService": 0,
+                        "shippingSpeed": 0,
+                        "productQuality": 0},
+            "numRatings": 0 
+        })
+    elif action == "views":
+        website["views"] += 1
+        collection.update_one({"url": { "$exists" : True }, 
+                               "url": content["URL"]},
+                                {"$set": {"views": website["views"]}})
+        return website
+    elif action == "ratings":
+        website["ratings"]["customerService"] += content["customerService"]
+        website["ratings"]["shippingSpeed"] += content["shippingSpeed"]
+        website["ratings"]["productQuality"] += content["productQuality"]
+        website["numRatings"] += 1;
+        collection.update_one({"url": { "$exists" : True }, 
+                               "url": content["URL"]},
+                                {"$set": {"ratings": website["ratings"],
+                                          "numRatings": website["numRatings"]
+                                        }})
+        return website
     else:
-        website = get_website(content)
-        website = collection.update_one({"url": content["URL"]},
-                              {"$set": {"ratings": [website["ratings"][0] + content["ratings"][0], 
-                                                    website["ratings"][1] + content["ratings"][1],
-                                                    website["ratings"][2] + content["ratings"][2],
-                                                    website["ratings"][3] + content["ratings"][3],
-                                                    website["ratings"][4] + content["ratings"][4]]}})
+        return log_warn_ret("Set web no action")
+
     return get_website(content)
 
 def get_website(content):
@@ -204,9 +323,10 @@ def get_website(content):
     website = collection.find_one({"url":content["URL"]})
     if website and '_id' in website:
         website['_id'] = str(website['_id'])
-        return website
+        return set_website("views",content, website)
     else:
-        return log_warn_ret("not found")
+        return set_website("new",content)
+
 
 #  Users {
 #           "id": lf0b2f55096f7622f6000000
@@ -218,7 +338,7 @@ def get_website(content):
 #  }
 
 def set_user(content):
-    existing_user = get_user(content)
+    existing_user = get_user("email",content)
     app.logger.warning(existing_user != "No user found")
     if existing_user == "No user found":
         date = datetime.datetime.now()
@@ -233,41 +353,55 @@ def set_user(content):
             "last_name": content["last_name"], 
             "first_name": content["first_name"], 
             "signup_date": date, 
-            "image":content["image"]})
-        return get_user(content)
+            "image":content["image"],
+            "likes":[],
+            "comments":[],
+            "history":[]
+            })
+        return get_user("email",content)
     else:
         return log_warn_ret("user already exist")
 
-def get_user(content):
-    if "email" not in content:
-        return log_warn_ret("No user email")
-    user = collection.find_one({"email": content["email"]}) 
+def get_user(action, content):
+    user = ""
+    if action == "email":
+        if "email" not in content:
+            return log_warn_ret("No user email")
+        user = collection.find_one({"email": content["email"]}) 
+    elif action == "id":
+        if "_id" not in content:
+            return log_warn_ret("No user id")
+        try:
+            user = collection.find_one({"_id": ObjectId(content["_id"])}) 
+        except:
+            return log_warn_ret("Get user by id no user")
+    else:
+        return log_warn_ret("No search method")
+
     if user and '_id' in user:
         user['_id'] = str(user['_id'])
         return user
     else:
         return log_info_ret("No user found")
 
-def get(category, search_method, content):
+def get(category, action, content):
     result = ""
     if category == "website":
         result = get_website(content)
     elif category == "user":
-        result = get_user(content)
+        result = get_user(action, content)
     elif category == "comments":
-        result = get_comments(search_method, content)
+        result = get_comments(action, content)
     else:
         return log_warn_ret("Unknown category")
     return result
 
-def set(category, search_method, content):
+def set(category, action, content):
     result = ""
-    if category == "website":
-        result = set_website(content)
-    elif category == "user":
+    if category == "user":
         result = set_user(content)
     elif category == "comments":
-        result = set_comments(search_method, content)
+        result = set_comments(action, content)
     else:
         return log_warn_ret("Unknown category")
     return result
@@ -278,10 +412,10 @@ def set(category, search_method, content):
 def origin():
     return jsonify(success=True)
 
-@app.route("/<action>/<category>/", methods=["POST","GET","OPTIONS"], defaults={'search_method': None})
-@app.route("/<action>/<category>/<search_method>/", methods=["POST","GET","OPTIONS"])
+@app.route("/<method>/<category>/", methods=["POST","GET","OPTIONS"], defaults={'action': None})
+@app.route("/<method>/<category>/<action>/", methods=["POST","GET","OPTIONS"])
 @cross_origin()
-def api(action, category, search_method):
+def api(method, category, action):
     if request.method == "OPTIONS":
         app.logger.info('OPTIONS')
         return jsonify(success=True)
@@ -290,16 +424,16 @@ def api(action, category, search_method):
         return jsonify(success=True)
     elif request.method == "POST":
         app.logger.info('POST')
-        if action and category:
+        if method and category:
             content = request.json
             result = ""
 
             app.logger.info(content)
             
-            if action == "get":
-                result = get(category, search_method, content)
-            elif action == "set":
-                result = set(category, search_method, content)
+            if method == "get":
+                result = get(category, action, content)
+            elif method == "set":
+                result = set(category, action, content)
             else:
                 return log_warn_ret("Unknown category")
 
@@ -307,7 +441,7 @@ def api(action, category, search_method):
             
             return jsonify(result)
         else:
-            return log_warn_ret("No action or category")
+            return log_warn_ret("No method or category")
     else:
         return log_warn_ret("Unknown request.method")
 
