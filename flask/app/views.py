@@ -25,6 +25,150 @@ def log_info_ret(message):
     app.logger.info(message)
     return message
     
+class website:
+    def __init__(self, url, create_if_not_found = False):
+        website = collection.find_one({"url":url})
+        if (not website or '_id' not in website) and create_if_not_found:
+            date = datetime.datetime.now()
+            website = collection.insert_one({
+                "url": url,
+                "views": 0,
+                "created": date,
+                "ratings": {"customerService": 0,
+                            "shippingSpeed": 0,
+                            "productQuality": 0},
+                "numRatings": 0 
+            })
+        website['_id'] = str(website['_id'])
+
+        self._id = website["_id"]
+        self.created = website["created"]
+        self.numRatings = website["numRatings"]
+        self.ratings["customerService"] = website["ratings"]["customerService"]
+        self.ratings["productQuality"] = website["ratings"]["productQuality"]
+        self.ratings["shippingSpeed"] = website["ratings"]["shippingSpeed"]
+        self.url = website["url"]
+        self.views = website["views"]
+    
+    def add_view():
+        self.views += 1
+        collection.update_one({"url": { "$exists" : True }, 
+                               "url": self.url},
+                     {"$set": {"views": self.views}})
+    def add_ratings(content):
+        self.ratings["customerService"] += content["ratings"]["customerService"]
+        self.ratings["shippingSpeed"] += content["ratings"]["shippingSpeed"]
+        self.ratings["productQuality"] += content["ratings"]["productQuality"]
+        self.numRatings += 1
+        collection.update_one({"url": { "$exists" : True }, 
+                               "url": self.url},
+                     {"$set": {"ratings": website["ratings"],
+                               "numRatings": website["numRatings"]
+                     }})
+    def output():
+        return jsonify({
+            "_id": self._id,
+            "created": self.created,
+            "numRatings": self.numRatings,
+            "ratings": self.ratings,
+            "url": self.url,
+            "views": self.views,
+        })
+
+class user:
+    def __init__(self, content, create_if_not_found = False):
+        user = collection.find_one({"email": content["email"]}) 
+        if (not user or '_id' not in user) and create_if_not_found:
+            date = datetime.datetime.now()
+            user = collection.insert_one({
+                "email": content["email"], 
+                "last_name": content["last_name"], 
+                "first_name": content["first_name"], 
+                "signup_date": date, 
+                "image":content["image"],
+                "likes":[],
+                "comments":[],
+                "history":[]
+                })
+
+        user['_id'] = str(user['_id'])
+        
+        self._id = user["_id"]
+        self.email = user["email"]
+        self.last_name = user["last_name"]
+        self.first_name = user["first_name"]
+        self.signup_date = user["signup_date"]
+        self.image = user["image"]
+        self.likes = user["likes"]
+        self.comments = user["comments"]
+        self.history = user["history"]
+  
+    def add_comment():
+        return
+    
+    def add_like():
+        return
+
+    def add_history():
+        return
+
+    def output():
+        return jsonify({
+            "_id": self._id,
+            "email": self.email,
+            "last_name": self.last_name,
+            "first_name": self.first_name,
+            "signup_date": self.signup_date,
+            "image": self.image,
+            "likes": self.likes,
+            "comments": self.comments,
+            "history": self.history,
+        }) 
+
+class comment:
+    def __init__(self, method, content, create_if_not_found = False):
+        content["URL"] = content["website"]
+        website = get_website(content)
+
+        website = set_website("ratings",content,website)
+
+
+        comment_id = collection.insert_one({"comment_type": content["comment_type"],
+                                         "website": content["website"], 
+                                         "user_id": content["user_id"], 
+                                         "title": content["title"], 
+                                         "child_comments": [], 
+                                         "ratings": content["ratings"], 
+                                         "text": content["text"], 
+                                         "date": date,
+                                         "views": 0,
+                                         "likes": [0,0],
+                                         })
+        
+        comment = get_comments("id",{"_id": comment_id.inserted_id})
+
+        content["_id"] = content["user_id"]
+        user = get_user("id",content) 
+        if user and '_id' in user:
+            user['_id'] = str(user['_id'])
+        else:
+            return comment
+        comment["user_id"] = user["_id"]
+        comment["email"] = user["email"]
+        comment["image"] = user["image"]
+        comment["first_name"] = user["first_name"]
+        comment["last_name"] = user["last_name"]
+    def add_child():
+        return
+    def add_view():
+        return
+    def like_child():
+        return
+    def like_parent():
+        return
+    def output():
+        return
+
 try:
     client = pymongo.MongoClient("mongodb+srv://todd:O12345@cluster0.nloih.mongodb.net/myFirstDatabase?retryWrites=true&w=majority",serverSelectionTimeoutMS=10, connectTimeoutMS=20000, socketTimeoutMS=None, socketKeepAlive=True, connect=False, maxPoolsize=1)
     if not client:
@@ -120,7 +264,7 @@ def set_comments(action, content, comment = None):
         if user == "Get user by id no user":
             return log_warn_ret("Get user by id no user")
 
-        if content["like"] == "true":
+        if content["like"] == True:
             comment["child_comments"][content["index"]]["likes"][0] += 1
         else:
             comment["child_comments"][content["index"]]["likes"][1] += 1
@@ -145,10 +289,11 @@ def set_comments(action, content, comment = None):
         if user == "Get user by id no user":
             return log_warn_ret("Get user by id no user")
         
-        if content["like"] == "true":
+        if content["like"] == True:
             comment["likes"][0] += 1
         else:
             comment["likes"][1] += 1
+
         collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
                                 {"$set": {"likes": comment["likes"]}})
         return comment
@@ -181,6 +326,12 @@ def set_comments(action, content, comment = None):
             return log_warn_ret("No comment shippingSpeed")
         elif "text" not in content:
             return log_warn_ret("No comment text")
+
+        content["URL"] = content["website"]
+        website = get_website(content)
+
+        website = set_website("ratings",content,website)
+
 
         comment_id = collection.insert_one({"comment_type": content["comment_type"],
                                          "website": content["website"], 
@@ -247,8 +398,12 @@ def get_comments(action, content):
                         {"$set": {"views": comment["views"],
                                   "child_comments": comment["child_comments"]
                                 }})
-            
+            # if ("child_comments" in comment and len(comment["child_comments"]) > 0)
+            #     comment["has_child_comments"] = True
+            # else:
+            #     comment["has_child_comments"] = False
 
+            comment.pop('child_comments', None)
     elif action == "user":
         if "user_id" not in content:
             return log_warn_ret("No comment user_id")
@@ -302,10 +457,10 @@ def set_website(action, content, website=None):
                                 {"$set": {"views": website["views"]}})
         return website
     elif action == "ratings":
-        website["ratings"]["customerService"] += content["customerService"]
-        website["ratings"]["shippingSpeed"] += content["shippingSpeed"]
-        website["ratings"]["productQuality"] += content["productQuality"]
-        website["numRatings"] += 1;
+        website["ratings"]["customerService"] += content["ratings"]["customerService"]
+        website["ratings"]["shippingSpeed"] += content["ratings"]["shippingSpeed"]
+        website["ratings"]["productQuality"] += content["ratings"]["productQuality"]
+        website["numRatings"] += 1
         collection.update_one({"url": { "$exists" : True }, 
                                "url": content["URL"]},
                                 {"$set": {"ratings": website["ratings"],
@@ -337,30 +492,33 @@ def get_website(content):
 #           "image":"jksahfdkjhquionq123213"
 #  }
 
-def set_user(content):
+def set_user(action, content):
     existing_user = get_user("email",content)
-    app.logger.warning(existing_user != "No user found")
-    if existing_user == "No user found":
-        date = datetime.datetime.now()
-        if "last_name" not in content:
-            return log_warn_ret("No user last_name")
-        elif "first_name" not in content:
-            return log_warn_ret("No user first_name")
-        elif "image" not in content:
-            return log_warn_ret("No user image")
-        new_user = collection.insert_one({
-            "email": content["email"], 
-            "last_name": content["last_name"], 
-            "first_name": content["first_name"], 
-            "signup_date": date, 
-            "image":content["image"],
-            "likes":[],
-            "comments":[],
-            "history":[]
-            })
-        return get_user("email",content)
-    else:
-        return log_warn_ret("user already exist")
+    if action == "new":
+        app.logger.warning(existing_user != "No user found")
+        if existing_user == "No user found":
+            date = datetime.datetime.now()
+            if "last_name" not in content:
+                return log_warn_ret("No user last_name")
+            elif "first_name" not in content:
+                return log_warn_ret("No user first_name")
+            elif "image" not in content:
+                return log_warn_ret("No user image")
+            new_user = collection.insert_one({
+                "email": content["email"], 
+                "last_name": content["last_name"], 
+                "first_name": content["first_name"], 
+                "signup_date": date, 
+                "image":content["image"],
+                "likes":[],
+                "comments":[],
+                "history":[]
+                })
+            return get_user("email",content)
+        else:
+            return log_warn_ret("user already exist")
+    # elif action == "add comment":
+
 
 def get_user(action, content):
     user = ""
@@ -399,7 +557,7 @@ def get(category, action, content):
 def set(category, action, content):
     result = ""
     if category == "user":
-        result = set_user(content)
+        result = set_user("new", content)
     elif category == "comments":
         result = set_comments(action, content)
     else:
