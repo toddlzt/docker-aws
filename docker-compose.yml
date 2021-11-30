@@ -20,14 +20,14 @@ services:
       - "80:80"
       - "443:443"
     # network_mode: bridge
-  react:
-    build: ./react-app
-    container_name: react
-    restart: always
-    stdin_open: true
-    depends_on:
-      - flask
-    ports:
-      - "8081:3000"
+  # react:
+  #   build: ./react-app
+  #   container_name: react
+  #   restart: always
+  #   stdin_open: true
+  #   depends_on:
+  #     - flask
+  #   ports:
+  #     - "8081:3000"
     # expose:
     #   - 8081

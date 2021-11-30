@@ -1,5 +1,5 @@
 flask
 uwsgi
-pymongo
+pymongo==3.12.1
 dnspython
 flask-cors

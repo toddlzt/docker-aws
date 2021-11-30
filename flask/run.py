@@ -13,4 +13,4 @@ def connect(host='https://google.com'):
 
 if __name__ == "__main__":
     print( "Connected" if connect() else "No internet!" )
-    app.run(debug=True)
+    app.run(debug=False)
