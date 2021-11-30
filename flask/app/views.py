@@ -276,7 +276,7 @@ def set_comments(action, content, comment = None):
                     user["likes"][content["parent_id"]][str(content["index"])] = False
                 collection.update_one({"email":{ "$exists" : True }, "_id": ObjectId(content["user_id"])},
                     {"$set": {"likes": user["likes"]}})
-        if len(comment["child_comments"]) >= content["index"]:
+        if len(comment["child_comments"]) <= content["index"]:
             return log_warn_ret("doesn't have this child comment")
         if content["like"] == True:
             comment["child_comments"][content["index"]]["likes"][0] += 1
@@ -438,13 +438,11 @@ def get_comments(action, content):
                                   "child_comments": comment["child_comments"]
                                 }})
             # get user likes and match with parent/child comments
-            print(dic_likes)
             if dic_likes and comment['_id'] in dic_likes:
-                comment["liked_by_user"] = False 
                 likes = dic_likes[comment['_id']]
                 for like in likes:
                     if like == "-1":
-                        comment["liked_by_user"] = True 
+                        comment["liked_by_user"] = likes[like] 
                     # else:
                     #     comment["child_comments"][like]["liked_by_user"] = True
 
@@ -483,15 +481,13 @@ def get_comments(action, content):
             if "likes" in user:
                 dic_likes = user["likes"][content["_id"]]
             # get user likes and match with parent/child comments
-            print(dic_likes)
-            comments["liked_by_user"] = False 
             for like in dic_likes:
                 if like == "-1":
-                    comments["liked_by_user"] = True 
+                    comments["liked_by_user"] = dic_likes[like] 
                 elif int(like) >= len(comments["child_comments"]):
                     continue
                 else:
-                    comments["child_comments"][int(like)]["liked_by_user"] = True
+                    comments["child_comments"][int(like)]["liked_by_user"] = dic_likes[like] 
         return comments
     else:
         return log_warn_ret("No search method")
