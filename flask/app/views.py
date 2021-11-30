@@ -264,6 +264,20 @@ def set_comments(action, content, comment = None):
         if user == "Get user by id no user":
             return log_warn_ret("Get user by id no user")
 
+        if "likes" in user:
+            if content["parent_id"] in user["likes"] and str(content["index"]) in user["likes"][content["parent_id"]]:
+                return log_warn_ret("Already liked")
+            else:
+                if content["parent_id"] not in user["likes"]:
+                    user["likes"][content["parent_id"]] = {}
+                if content["like"] == True:
+                    user["likes"][content["parent_id"]][str(content["index"])] = True
+                else:
+                    user["likes"][content["parent_id"]][str(content["index"])] = False
+                collection.update_one({"email":{ "$exists" : True }, "_id": ObjectId(content["user_id"])},
+                    {"$set": {"likes": user["likes"]}})
+        if len(comment["child_comments"]) >= content["index"]:
+            return log_warn_ret("doesn't have this child comment")
         if content["like"] == True:
             comment["child_comments"][content["index"]]["likes"][0] += 1
         else:
@@ -272,6 +286,9 @@ def set_comments(action, content, comment = None):
 
         collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
                                 {"$set": {"child_comments": comment["child_comments"]}})
+
+        collection.update_one()
+
         return comment
     elif action == "like_parent":
         if "user_id" not in content:
@@ -293,6 +310,19 @@ def set_comments(action, content, comment = None):
             comment["likes"][0] += 1
         else:
             comment["likes"][1] += 1
+
+        if "likes" in user:
+            if content["parent_id"] in user["likes"] and "-1" in user["likes"][content["parent_id"]]:
+                return log_warn_ret("Already liked")
+            else:
+                if content["parent_id"] not in user["likes"]:
+                    user["likes"][content["parent_id"]] = {}
+                if content["like"] == True:
+                    user["likes"][content["parent_id"]]["-1"] = True
+                else:
+                    user["likes"][content["parent_id"]]["-1"] = False
+            collection.update_one({"email":{ "$exists" : True }, "_id": ObjectId(content["user_id"])},
+                                {"$set": {"likes": user["likes"]}})
 
         collection.update_one({"comment_type":{ "$exists" : True }, "_id": ObjectId(content["parent_id"])},
                                 {"$set": {"likes": comment["likes"]}})
@@ -372,6 +402,15 @@ def get_comments(action, content):
             return log_warn_ret("No comment website")
         
         comments = list(collection.find({"comment_type":{ "$exists" : True }, "website": content["website"]}))
+        dic_likes = {}
+        if "user_id" in content:
+            user = get_user("id",{"_id" : content["user_id"]}) 
+            if user and '_id' in user:
+                user['_id'] = str(user['_id'])
+            else:
+                return log_warn_ret("User id invalid")
+            if "likes" in user:
+                dic_likes = user["likes"]
         for comment in comments:
             s = ""
             if comment and '_id' in comment:
@@ -398,6 +437,17 @@ def get_comments(action, content):
                         {"$set": {"views": comment["views"],
                                   "child_comments": comment["child_comments"]
                                 }})
+            # get user likes and match with parent/child comments
+            print(dic_likes)
+            if dic_likes and comment['_id'] in dic_likes:
+                comment["liked_by_user"] = False 
+                likes = dic_likes[comment['_id']]
+                for like in likes:
+                    if like == "-1":
+                        comment["liked_by_user"] = True 
+                    # else:
+                    #     comment["child_comments"][like]["liked_by_user"] = True
+
             # if ("child_comments" in comment and len(comment["child_comments"]) > 0)
             #     comment["has_child_comments"] = True
             # else:
@@ -423,6 +473,25 @@ def get_comments(action, content):
             return log_warn_ret("No valid comment id")
         if comments and '_id' in comments:
             comments['_id'] = str(comments['_id'])
+        dic_likes = {}
+        if "user_id" in content:
+            user = get_user("id",{"_id" : content["user_id"]}) 
+            if user and '_id' in user:
+                user['_id'] = str(user['_id'])
+            else:
+                return log_warn_ret("User id invalid")
+            if "likes" in user:
+                dic_likes = user["likes"][content["_id"]]
+            # get user likes and match with parent/child comments
+            print(dic_likes)
+            comments["liked_by_user"] = False 
+            for like in dic_likes:
+                if like == "-1":
+                    comments["liked_by_user"] = True 
+                elif int(like) >= len(comments["child_comments"]):
+                    continue
+                else:
+                    comments["child_comments"][int(like)]["liked_by_user"] = True
         return comments
     else:
         return log_warn_ret("No search method")
@@ -510,8 +579,8 @@ def set_user(action, content):
                 "first_name": content["first_name"], 
                 "signup_date": date, 
                 "image":content["image"],
-                "likes":[],
-                "comments":[],
+                "likes":{},
+                "comments":{},
                 "history":[]
                 })
             return get_user("email",content)
@@ -538,6 +607,12 @@ def get_user(action, content):
 
     if user and '_id' in user:
         user['_id'] = str(user['_id'])
+        total_likes = 0
+        for like in user["likes"]:
+            total_likes += len(user["likes"][like])
+        user['total_likes'] = total_likes
+        user['total_history'] = 0
+        user['total_comments'] = 0
         return user
     else:
         return log_info_ret("No user found")
